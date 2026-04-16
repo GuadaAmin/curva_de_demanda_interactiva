@@ -2,101 +2,214 @@ import streamlit as st
 import numpy as np
 import matplotlib.pyplot as plt
 
+# ------------------------------------------------------------
 # Configuración de la página
-st.set_page_config(page_title="Curva de Demanda", layout="centered")
-st.title("Curva de Demanda Interactiva")
-st.markdown("Herramienta de exploración sobre los conceptos de **movimiento a lo largo de la curva**, **desplazamientos** y **cambios en la sensibilidad al precio**.")
-st.markdown("Por: Abregú Candela, Amin Guadalupe, y Luciana Pasteris.")
-st.markdown("Economía 2026")
+# ------------------------------------------------------------
+st.set_page_config(page_title="Curva de Demanda - Herramienta Didáctica", layout="centered")
+st.title("📉 Construcción de Curvas de Demanda")
+st.markdown("Define una curva de demanda mediante **dos puntos** o **un punto y la pendiente económica**. Guarda múltiples curvas y compáralas.")
 
-# Función auxiliar para graficar la curva de demanda (forma estándar)
-def graficar_demanda(intercepto, pendiente, Q_max=700, punto=None, titulo="", referencia=None):
+# ------------------------------------------------------------
+# Inicialización de variables de estado
+# ------------------------------------------------------------
+if "curvas_guardadas" not in st.session_state:
+    st.session_state.curvas_guardadas = []  # Lista de dicts con {'a': , 'b': , 'nombre': }
+if "curva_actual" not in st.session_state:
+    st.session_state.curva_actual = {'a': 100.0, 'b': 2.0}  # Q = a - bP
+
+# ------------------------------------------------------------
+# Funciones de conversión entre formas matemática y económica
+# ------------------------------------------------------------
+def demanda_economica_a_matematica(a, b):
     """
-    referencia: tupla (intercepto_ref, pendiente_ref) para mostrar curva original como referencia
+    a: cantidad demandada cuando P=0 (intercepto con eje Q)
+    b: pendiente económica (ΔQ/ΔP, valor positivo)
+    Forma económica: Q = a - b·P
+    Forma matemática: P = (a/b) - (1/b)·Q
+    Retorna (intercepto_P, pendiente_P) para graficar P en función de Q
     """
-    Q = np.linspace(0, Q_max, 200)
-    P = intercepto - pendiente * Q
-    P = np.maximum(P, 0)
+    intercepto_P = a / b  # Precio máximo
+    pendiente_P = -1 / b   # Pendiente negativa para graficar
+    return intercepto_P, pendiente_P
+
+def actualizar_curva_desde_puntos(P1, Q1, P2, Q2):
+    """
+    Dados dos puntos (P, Q) en la curva de demanda,
+    calcula los parámetros económicos a y b (Q = a - bP)
+    """
+    b = (Q1 - Q2) / (P2 - P1) if (P2 - P1) != 0 else 0.001
+    b = abs(b)  # Pendiente positiva por convención
+    a = Q1 + b * P1
+    return a, b
+
+def actualizar_curva_desde_punto_pendiente(P1, Q1, pendiente_economica):
+    """
+    Dados un punto (P, Q) y la pendiente económica b,
+    calcula a (Q = a - bP)
+    """
+    b = abs(pendiente_economica)
+    a = Q1 + b * P1
+    return a, b
+
+# ------------------------------------------------------------
+# Función para graficar
+# ------------------------------------------------------------
+def graficar_todas_las_curvas(a_actual, b_actual, curvas_guardadas, P_max, Q_max_fijo):
+    """
+    Grafica la curva actual y todas las curvas guardadas.
+    P_max: límite superior del eje P (calculado como 1.1 * a_actual/b_actual)
+    """
+    fig, ax = plt.subplots(figsize=(10, 6))
     
-    fig, ax = plt.subplots(figsize=(8, 5))
+    # Colores para las curvas guardadas (tonos grises)
+    colores_gris = ['#888888', '#AAAAAA', '#CCCCCC', '#DDDDDD', '#EEEEEE']
     
-    # Curva actual (sólida)
-    ax.plot(Q, P, 'b-', linewidth=2, label='Curva actual')
+    # Graficar curvas guardadas
+    for idx, curva in enumerate(curvas_guardadas):
+        a_g = curva['a']
+        b_g = curva['b']
+        inter_p, pend_p = demanda_economica_a_matematica(a_g, b_g)
+        Q_vals = np.linspace(0, Q_max_fijo, 200)
+        P_vals = inter_p + pend_p * Q_vals
+        P_vals = np.maximum(P_vals, 0)
+        color = colores_gris[idx % len(colores_gris)]
+        ax.plot(Q_vals, P_vals, color=color, linewidth=1.5, linestyle='--',
+                label=f"Curva guardada: Q = {a_g:.1f} - {b_g:.2f}·P")
     
-    # Curva de referencia (discontinua) si se proporciona
-    if referencia:
-        inter_ref, pend_ref = referencia
-        P_ref = inter_ref - pend_ref * Q
-        P_ref = np.maximum(P_ref, 0)
-        ax.plot(Q, P_ref, 'r--', linewidth=1.5, alpha=0.7, label='Curva original (referencia)')
+    # Graficar curva actual
+    inter_p_act, pend_p_act = demanda_economica_a_matematica(a_actual, b_actual)
+    Q_vals = np.linspace(0, Q_max_fijo, 200)
+    P_vals = inter_p_act + pend_p_act * Q_vals
+    P_vals = np.maximum(P_vals, 0)
+    ax.plot(Q_vals, P_vals, 'b-', linewidth=3, label=f"Curva actual: Q = {a_actual:.1f} - {b_actual:.2f}·P")
     
-    if punto:
-        q, p = punto
-        ax.plot(q, p, 'ro', markersize=8)
-        ax.annotate(f'({q:.1f}, {p:.1f})', (q, p), xytext=(5, 5),
-                    textcoords='offset points', fontsize=9)
-    
-    ax.set_xlim(0, 700)   # escala fija
-    ax.set_ylim(0, 35)   # escala fija
+    # Configurar ejes
+    ax.set_xlim(0, Q_max_fijo)
+    y_max = max(inter_p_act * 1.1, max([inter_p_act] + [curva['a']/curva['b'] for curva in curvas_guardadas], default=0) * 1.1)
+    ax.set_ylim(0, y_max)
     ax.set_xlabel("Cantidad demandada (Q)")
     ax.set_ylabel("Precio (P)")
-    ax.set_title(titulo)
+    ax.set_title("Curva(s) de Demanda - Forma económica: Q = a - b·P")
     ax.grid(True, linestyle='--', alpha=0.6)
-    ax.legend()
-    return fig
+    ax.legend(loc='upper right', fontsize=8)
+    
+    return fig, y_max
 
-# PESTAÑA 1: Movimiento a lo largo de la misma curva D1 (con deslizador)
-tab1, tab2, tab3= st.tabs(["📌 Movimiento sobre D1", "↔️ Cambio en ordenada al origen", "📐 Cambio en pendiente"])
+# ------------------------------------------------------------
+# INTERFAZ PRINCIPAL
+# ------------------------------------------------------------
 
-with tab1:
-    st.header("Movimiento a lo largo de una misma curva de demanda")
-    st.markdown("**Desliza el punto sobre la curva** para ver cómo varía la cantidad demandada al cambiar el precio.")
-    
-    intercepto_fijo = 30.0
-    pendiente_fija = 0.05
-    Q_max = 700
-    
-    cantidad_punto = st.slider("Cantidad demandada (punto móvil)", min_value=0.0, max_value=600.0, value=300.0, step=0.5, key="punto_movil")
-    precio_punto = intercepto_fijo - pendiente_fija * cantidad_punto
-    precio_punto = max(precio_punto, 0)
-    
-    fig1 = graficar_demanda(intercepto_fijo, pendiente_fija, Q_max=Q_max,
-                            punto=(cantidad_punto, precio_punto),
-                            titulo=f"Punto sobre D₁: Q = {cantidad_punto:.1f}, P = {precio_punto:.1f}")
-    st.pyplot(fig1)
-    
-    st.markdown("**Fundamento económico:** Un movimiento a lo largo de la curva de demanda se origina exclusivamente por una variación en el precio del bien, manteniéndose constantes los demás factores (ingresos, gustos, precios de sustitutos). Conforme la ley de la demanda establece, un aumento del precio reduce la cantidad demandada, y una disminución la incrementa, desplazando el punto de equilibrio sobre la misma curva.")
+# Sección 1: Definición de la curva original por el usuario
+st.header("1. Definir la curva original")
 
-# PESTAÑA 2: Cambio continuo en la ordenada al origen (intercepto) 
-with tab2:
-    st.header("Impacto de cambios en la ordenada al origen (intercepto)")
-    st.markdown("Ajusta el **precio máximo** que los consumidores estarían dispuestos a pagar por la primera unidad.")
-    
-    intercepto = st.slider("Intercepto (Precio máximo)", min_value=0.0, max_value=60.0, value=30.0, step=1.0, key="intercepto_slider")
-    pendiente_const = 0.05
-    Q_max2 = 700
-    
-    fig2 = graficar_demanda(intercepto, pendiente_const,
-                            titulo=f"Demanda: P = {intercepto:.1f} - {pendiente_const}·Q", referencia=(30.0, 0.05))
-    st.pyplot(fig2)
-    
-    st.markdown("**Fundamento económico:** La curva de demanda se desplaza cuando varían factores distintos al precio del bien, tales como el ingreso de los consumidores (diferenciando bienes normales de inferiores), los precios de bienes sustitutos o complementarios, los gustos, las expectativas futuras o el número de compradores. Un desplazamiento hacia la derecha refleja un aumento de la demanda; hacia la izquierda, una disminución.")
+metodo = st.radio("¿Cómo deseas definir la curva?", 
+                  ["Dos puntos (P, Q)", "Un punto + pendiente económica"])
 
-# PESTAÑA 3: Cambio continuo en la pendiente
-with tab3:
-    st.header("Impacto de cambios en la pendiente (sensibilidad al precio)")
-    st.markdown("Modifica la **inclinación** de la curva: pendiente alta → poco sensible; pendiente baja → muy sensible.")
-    
-    pendiente = st.slider("Pendiente (valor absoluto)", min_value=0.01, max_value=0.1, value=0.05, step=0.01, key="pendiente_slider")
-    intercepto_const = 30.0
-    Q_max3 = 700
-    
-    fig3 = graficar_demanda(intercepto_const, pendiente,
-                            titulo=f"Demanda: P = {intercepto_const} - {pendiente:.2f}·Q", referencia=(30.0, 0.05))
-    st.pyplot(fig3)
-    
-    st.markdown("**Fundamento económico:** La pendiente de la demanda refleja la sensibilidad de la cantidad demandada ante variaciones en el precio. Una pendiente más inclinada indica menor capacidad de sustitución o un horizonte temporal corto. Por el contrario, una pendiente más plana surge cuando existen sustitutos cercanos.")
+col1, col2 = st.columns(2)
 
-# Pie de página
-st.markdown("---")
-st.caption("Herramienta didáctica basada en la ley de demanda | Interactúa con los sliders para visualizar los conceptos económicos | Realizada por Guadalupe Amin, Candela Abregú, y Luciana Pasteris, 2026.")
+if metodo == "Dos puntos (P, Q)":
+    with col1:
+        st.subheader("Punto A")
+        P_A = st.number_input("Precio A (P)", min_value=0.0, max_value=200.0, value=50.0, step=1.0, key="PA")
+        Q_A = st.number_input("Cantidad A (Q)", min_value=0.0, max_value=200.0, value=50.0, step=1.0, key="QA")
+    with col2:
+        st.subheader("Punto B")
+        P_B = st.number_input("Precio B (P)", min_value=0.0, max_value=200.0, value=20.0, step=1.0, key="PB")
+        Q_B = st.number_input("Cantidad B (Q)", min_value=0.0, max_value=200.0, value=80.0, step=1.0, key="QB")
+    
+    if st.button("Calcular curva"):
+        try:
+            a, b = actualizar_curva_desde_puntos(P_A, Q_A, P_B, Q_B)
+            st.session_state.curva_actual = {'a': a, 'b': b}
+            st.success(f"Curva calculada: Q = {a:.2f} - {b:.2f}·P")
+        except Exception as e:
+            st.error(f"Error al calcular: {e}")
+else:
+    with col1:
+        P_punto = st.number_input("Precio del punto (P)", min_value=0.0, max_value=200.0, value=50.0, step=1.0, key="Ppunto")
+        Q_punto = st.number_input("Cantidad del punto (Q)", min_value=0.0, max_value=200.0, value=50.0, step=1.0, key="Qpunto")
+    with col2:
+        pendiente_econ = st.number_input("Pendiente económica (b = ΔQ/ΔP)", min_value=0.01, max_value=10.0, value=2.0, step=0.1, key="pend_econ")
+    
+    if st.button("Calcular curva"):
+        a, b = actualizar_curva_desde_punto_pendiente(P_punto, Q_punto, pendiente_econ)
+        st.session_state.curva_actual = {'a': a, 'b': b}
+        st.success(f"Curva calculada: Q = {a:.2f} - {b:.2f}·P")
+
+# ------------------------------------------------------------
+# Sección 2: Sliders para modificar la curva actual
+# ------------------------------------------------------------
+st.header("2. Modificar la curva actual en tiempo real")
+
+col_s1, col_s2 = st.columns(2)
+with col_s1:
+    a_slider = st.slider("Parámetro a (cantidad demandada cuando P=0)", 
+                          min_value=0.0, max_value=300.0, 
+                          value=st.session_state.curva_actual['a'], step=5.0, key="a_slider")
+with col_s2:
+    b_slider = st.slider("Pendiente económica b (ΔQ/ΔP, sensibilidad al precio)", 
+                          min_value=0.1, max_value=10.0, 
+                          value=st.session_state.curva_actual['b'], step=0.1, key="b_slider")
+
+# Actualizar la curva actual con los sliders
+st.session_state.curva_actual['a'] = a_slider
+st.session_state.curva_actual['b'] = b_slider
+
+# Calcular Q máximo fijo para todos los gráficos
+Q_max_fijo = max(300, max([c['a'] for c in st.session_state.curvas_guardadas], default=0) + 50)
+Q_max_fijo = max(Q_max_fijo, st.session_state.curva_actual['a'] + 50)
+
+fig, y_max = graficar_todas_las_curvas(
+    st.session_state.curva_actual['a'],
+    st.session_state.curva_actual['b'],
+    st.session_state.curvas_guardadas,
+    None,
+    Q_max_fijo
+)
+st.pyplot(fig)
+
+# Mostrar información de los ejes
+st.caption(f"Eje P fijo hasta {y_max:.1f} | Eje Q fijo hasta {Q_max_fijo}")
+
+# ------------------------------------------------------------
+# Guardar curva
+# ------------------------------------------------------------
+st.header("Guardar curva para comparar")
+
+nombre_curva = st.text_input("Nombre de la curva a guardar", value=f"Curva {len(st.session_state.curvas_guardadas)+1}")
+col_b1, col_b2 = st.columns(2)
+with col_b1:
+    if st.button("💾 Guardar curva actual"):
+        st.session_state.curvas_guardadas.append({
+            'a': st.session_state.curva_actual['a'],
+            'b': st.session_state.curva_actual['b'],
+            'nombre': nombre_curva
+        })
+        st.success(f"Curva guardada: {nombre_curva}")
+with col_b2:
+    if st.button("🗑️ Limpiar curvas guardadas") and len(st.session_state.curvas_guardadas) > 0:
+        st.session_state.curvas_guardadas = []
+        st.warning("Se eliminaron todas las curvas guardadas")
+
+# Mostrar curvas guardadas
+if st.session_state.curvas_guardadas:
+    st.write("**Curvas guardadas:**")
+    for i, c in enumerate(st.session_state.curvas_guardadas):
+        st.write(f"{i+1}. {c['nombre']}: Q = {c['a']:.1f} - {c['b']:.2f}·P")
+
+# ------------------------------------------------------------
+# Explicaciones didácticas
+# ------------------------------------------------------------
+st.header("📖 Fundamentos económicos")
+st.markdown("""
+- **Forma económica de la demanda lineal:** Q = a - b·P
+  - **a:** Cantidad demandada cuando el precio es cero (intercepto con el eje Q).
+  - **b:** Pendiente económica (ΔQ/ΔP). Indica cuánto varía la cantidad demandada ante un cambio unitario en el precio. Siempre positiva por la ley de la demanda.
+- **Forma matemática (para graficar):** P = (a/b) - (1/b)·Q
+  - El precio máximo (ordenada al origen) es a/b.
+  - La pendiente de la recta en el gráfico es -1/b.
+- **Movimiento a lo largo de la curva:** Cambia solo el precio.
+- **Desplazamiento de la curva:** Cambia el parámetro a (ingresos, gustos, etc.) o b (sustitutos, horizonte temporal).
+""")
+
+st.caption("Herramienta didáctica - Construye, modifica y compara múltiples curvas de demanda.")
