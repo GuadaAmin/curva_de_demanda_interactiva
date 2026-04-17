@@ -18,8 +18,6 @@ if "curvas_guardadas" not in st.session_state:
     st.session_state.curvas_guardadas = []  # Lista de dicts con {'a': , 'b': , 'nombre': }
 if "curva_actual" not in st.session_state:
     st.session_state.curva_actual = {'a': 100.0, 'b': 2.0}  # Q = a - bP
-if "limites_fijos" not in st.session_state:
-    st.session_state.limites_fijos = None  # Se asignará cuando se calcule la primera curva
 
 # ------------------------------------------------------------
 # Funciones de conversión entre formas matemática y económica
@@ -58,15 +56,14 @@ def actualizar_curva_desde_punto_pendiente(P1, Q1, pendiente_economica):
 # ------------------------------------------------------------
 # Función para graficar
 # ------------------------------------------------------------
-def graficar_todas_las_curvas(a_actual, b_actual, curvas_guardadas, Q_max_fijo, P_max_fijo):
+def graficar_todas_las_curvas(a_actual, b_actual, curvas_guardadas, P_max, Q_max_fijo):
     """
     Grafica la curva actual y todas las curvas guardadas.
-    Q_max_fijo: límite superior del eje Q (fijo)
-    P_max_fijo: límite superior del eje P (fijo)
+    P_max: límite superior del eje P (calculado como 1.1 * a_actual/b_actual)
     """
     fig, ax = plt.subplots(figsize=(10, 6))
     
-    # Colores para las curvas guardadas
+    # Colores para las curvas guardadas (tonos grises)
     colores_gris = ['#888888', '#AAAAAA', '#CCCCCC', '#DDDDDD', '#EEEEEE']
     
     # Graficar curvas guardadas
@@ -79,25 +76,26 @@ def graficar_todas_las_curvas(a_actual, b_actual, curvas_guardadas, Q_max_fijo, 
         P_vals = np.maximum(P_vals, 0)
         color = colores_gris[idx % len(colores_gris)]
         ax.plot(Q_vals, P_vals, color=color, linewidth=1.5, linestyle='--',
-                label=f"Guardada: Q = {a_g:.1f} - {b_g:.2f}·P")
+                label=f"Curva guardada: Q = {a_g:.1f} - {b_g:.2f}·P")
     
     # Graficar curva actual
     inter_p_act, pend_p_act = demanda_economica_a_matematica(a_actual, b_actual)
     Q_vals = np.linspace(0, Q_max_fijo, 200)
     P_vals = inter_p_act + pend_p_act * Q_vals
     P_vals = np.maximum(P_vals, 0)
-    ax.plot(Q_vals, P_vals, 'b-', linewidth=3, label=f"Actual: Q = {a_actual:.1f} - {b_actual:.2f}·P")
+    ax.plot(Q_vals, P_vals, 'b-', linewidth=3, label=f"Curva actual: Q = {a_actual:.1f} - {b_actual:.2f}·P")
     
-    # Configurar ejes con límites FIJOS
+    # Configurar ejes
     ax.set_xlim(0, Q_max_fijo)
-    ax.set_ylim(0, P_max_fijo)
+    y_max = max(inter_p_act * 1.1, max([inter_p_act] + [curva['a']/curva['b'] for curva in curvas_guardadas], default=0) * 1.1)
+    ax.set_ylim(0, y_max)
     ax.set_xlabel("Cantidad demandada (Q)")
     ax.set_ylabel("Precio (P)")
     ax.set_title("Curva(s) de Demanda - Forma económica: Q = a - b·P")
     ax.grid(True, linestyle='--', alpha=0.6)
     ax.legend(loc='upper right', fontsize=8)
     
-    return fig
+    return fig, y_max
 
 # ------------------------------------------------------------
 # INTERFAZ PRINCIPAL
@@ -123,16 +121,8 @@ if metodo == "Dos puntos (P, Q)":
     
     if st.button("Calcular curva"):
         try:
-            a, b = actualizar_curva_desde_puntos(P_A, Q_A, P_B, Q_B)  # o desde punto+pendiente
+            a, b = actualizar_curva_desde_puntos(P_A, Q_A, P_B, Q_B)
             st.session_state.curva_actual = {'a': a, 'b': b}
-            
-            # Fijar los límites de los ejes SOLO UNA VEZ (si aún no están fijos)
-            if st.session_state.limites_fijos is None:
-                inter_p, _ = demanda_economica_a_matematica(a, b)
-                P_max_fijo = inter_p * 1.1  # 10% más que el precio máximo de la primera curva
-                Q_max_fijo = a + 50  # Cantidad máxima: a + un margen
-                st.session_state.limites_fijos = {'P_max': P_max_fijo, 'Q_max': Q_max_fijo}
-            
             st.success(f"Curva calculada: Q = {a:.2f} - {b:.2f}·P")
         except Exception as e:
             st.error(f"Error al calcular: {e}")
@@ -167,25 +157,19 @@ with col_s2:
 st.session_state.curva_actual['a'] = a_slider
 st.session_state.curva_actual['b'] = b_slider
 
-# Obtener límites fijos (si no existen, usar valores por defecto)
-if st.session_state.limites_fijos is None:
-    # Si aún no se ha definido ninguna curva, usar valores por defecto
-    Q_max_fijo = 200
-    P_max_fijo = 150
-else:
-    Q_max_fijo = st.session_state.limites_fijos['Q_max']
-    P_max_fijo = st.session_state.limites_fijos['P_max']
+# Calcular Q máximo fijo para todos los gráficos
+Q_max_fijo = max(300, max([c['a'] for c in st.session_state.curvas_guardadas], default=0) + 50)
+Q_max_fijo = max(Q_max_fijo, st.session_state.curva_actual['a'] + 50)
 
-fig = graficar_todas_las_curvas(
+fig, y_max = graficar_todas_las_curvas(
     st.session_state.curva_actual['a'],
     st.session_state.curva_actual['b'],
     st.session_state.curvas_guardadas,
-    Q_max_fijo,
-    P_max_fijo
+    None,
+    Q_max_fijo
 )
 st.pyplot(fig)
 
-st.caption(f"Ejes fijos: P hasta {P_max_fijo:.1f} | Q hasta {Q_max_fijo:.1f} (definidos con la primera curva)")
 # Mostrar información de los ejes
 st.caption(f"Eje P fijo hasta {y_max:.1f} | Eje Q fijo hasta {Q_max_fijo}")
 
