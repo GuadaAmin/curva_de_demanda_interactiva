@@ -2,26 +2,20 @@ import streamlit as st
 import numpy as np
 import matplotlib.pyplot as plt
 
-# ------------------------------------------------------------
 # Configuración de la página
-# ------------------------------------------------------------
 st.set_page_config(page_title="Curva de Demanda - Herramienta Didáctica", layout="centered")
 st.title("📉 Construcción de Curvas de Demanda")
 st.markdown("Define una curva de demanda mediante **dos puntos** o **un punto y la pendiente económica**. Guarda múltiples curvas y comparalas.")
 st.markdown("Por: Abregú Candela, Amin Guadalupe, y Luciana Pasteris.")
 st.markdown("Economía 2026")
 
-# ------------------------------------------------------------
 # Inicialización de variables de estado
-# ------------------------------------------------------------
 if "curvas_guardadas" not in st.session_state:
     st.session_state.curvas_guardadas = []  # Lista de dicts con {'a': , 'b': , 'nombre': }
 if "curva_actual" not in st.session_state:
     st.session_state.curva_actual = {'a': 100.0, 'b': 2.0}  # Q = a - bP
 
-# ------------------------------------------------------------
 # Funciones de conversión entre formas matemática y económica
-# ------------------------------------------------------------
 def demanda_economica_a_matematica(a, b):
     """
     a: cantidad demandada cuando P=0 (intercepto con eje Q) --> Punto de saciedad
@@ -53,9 +47,7 @@ def actualizar_curva_desde_punto_pendiente(P1, Q1, pendiente_economica):
     a = Q1 + b * P1
     return a, b
 
-# ------------------------------------------------------------
 # Función para graficar
-# ------------------------------------------------------------
 def graficar_todas_las_curvas(a_actual, b_actual, curvas_guardadas, punto=None):
     """
     Grafica la curva actual y todas las curvas guardadas.
@@ -121,9 +113,8 @@ def graficar_todas_las_curvas(a_actual, b_actual, curvas_guardadas, punto=None):
     
     return fig
 
-# ------------------------------------------------------------
+
 # INTERFAZ PRINCIPAL
-# ------------------------------------------------------------
 
 # Sección 1: Definición de la curva original por el usuario
 st.header("1. Definir la curva original")
@@ -162,9 +153,7 @@ else:
         st.session_state.curva_actual = {'a': a, 'b': b}
         st.success(f"Curva calculada: Q = {a:.2f} - {b:.2f}·P")
 
-# ------------------------------------------------------------
 # Sección 2: Sliders para modificar la curva actual y desplazarse
-# ------------------------------------------------------------
 st.header("2. Modificar la curva actual en tiempo real")
 
 col_s1, col_s2 = st.columns(2)
@@ -229,9 +218,7 @@ st.pyplot(fig)
 
 st.caption("Los ejes se ajustan automáticamente para mostrar todas las curvas completas.")
 
-# ------------------------------------------------------------
 # Guardar curva
-# ------------------------------------------------------------
 st.header("Guardar curva para comparar")
 
 nombre_curva = st.text_input("Nombre de la curva a guardar", value=f"Curva {len(st.session_state.curvas_guardadas)+1}")
@@ -255,9 +242,7 @@ if st.session_state.curvas_guardadas:
     for i, c in enumerate(st.session_state.curvas_guardadas):
         st.write(f"{i+1}. {c['nombre']}: Q = {c['a']:.1f} - {c['b']:.2f}·P")
 
-# ------------------------------------------------------------
-# Explicaciones didácticas
-# ------------------------------------------------------------
+# Explicaciones 
 st.header("📖 Fundamentos económicos")
 st.markdown("""
 - **Forma económica de la demanda lineal:** Q = a - b·P
