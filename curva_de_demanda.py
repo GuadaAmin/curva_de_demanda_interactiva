@@ -138,7 +138,11 @@ if metodo == "Dos puntos (P, Q)":
         try:
             a, b = actualizar_curva_desde_puntos(P_A, Q_A, P_B, Q_B)
             st.session_state.curva_actual = {'a': a, 'b': b}
+            # FORZAR ACTUALIZACIÓN DE LOS SLIDERS
+            st.session_state.a_slider = a
+            st.session_state.b_slider = b
             st.success(f"Curva calculada: Q = {a:.2f} - {b:.2f}·P")
+            st.rerun()  # Forzar recarga para que los sliders muestren el nuevo valor
         except Exception as e:
             st.error(f"Error al calcular: {e}")
 else:
@@ -151,7 +155,11 @@ else:
     if st.button("Calcular curva"):
         a, b = actualizar_curva_desde_punto_pendiente(P_punto, Q_punto, pendiente_econ)
         st.session_state.curva_actual = {'a': a, 'b': b}
+        # FORZAR ACTUALIZACIÓN DE LOS SLIDERS
+        st.session_state.a_slider = a
+        st.session_state.b_slider = b
         st.success(f"Curva calculada: Q = {a:.2f} - {b:.2f}·P")
+        st.rerun()
 
 # Sección 2: Sliders para modificar la curva actual y desplazarse
 st.header("2. Modificar la curva actual en tiempo real")
@@ -165,7 +173,7 @@ with col_s2:
     b_slider = st.slider("Pendiente económica b (ΔQ/ΔP, sensibilidad al precio)", 
                           min_value=0.1, max_value=10.0, 
                           value=st.session_state.curva_actual['b'], step=0.1, key="b_slider")
-
+    
 # ACTUALIZAR la curva actual con los valores de los sliders
 st.session_state.curva_actual['a'] = a_slider
 st.session_state.curva_actual['b'] = b_slider
