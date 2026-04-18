@@ -166,11 +166,11 @@ st.header("2. Modificar la curva actual en tiempo real")
 
 col_s1, col_s2 = st.columns(2)
 with col_s1:
-    a_slider = st.slider("Parámetro a, cambio de precio máximo y punto de saciedad", 
+    a_slider = st.slider("Parámetro a, cambio de precio máximo que pagarían clientes y punto de saciedad", 
                           min_value=0.0, max_value=300.0, 
                           value=st.session_state.curva_actual['a'], step=5.0, key="a_slider")
 with col_s2:
-    b_slider = st.slider("Pendiente económica b (ΔQ/ΔP, sensibilidad al precio)", 
+    b_slider = st.slider("Pendiente económica b (ΔQ/ΔP, sensibilidad de la demanda al cambio de precio)", 
                           min_value=0.1, max_value=10.0, 
                           value=st.session_state.curva_actual['b'], step=0.1, key="b_slider")
     
